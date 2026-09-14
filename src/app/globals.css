@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --background: #090a0c;
+  --foreground: #f4f4f5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+::selection { background: #dc2626; color: white; }
+.product-visual { background: radial-gradient(circle at 72% 28%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 30%), linear-gradient(135deg, #17191d, #0c0d0f 65%); }
+.grid-lines { background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 42px 42px; }
+.admin-input { margin-top: 0.5rem; width: 100%; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.2); padding: .75rem 1rem; font-size: .875rem; color: white; outline: none; }
+.admin-input:focus { border-color: rgb(239 68 68); }
