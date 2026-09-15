@@ -1,13 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPrice } from "../data";
 import { formatOrderDateTime, orderWhatsAppUrl } from "../whatsapp";
 import type { Order } from "../orderTypes";
 
 export function OrderSuccess({ order }: { order: Order }) {
   const [copied, setCopied] = useState(false);
+  const [whatsappUrl, setWhatsappUrl] = useState(
+    "https:" + "//wa.me/" + "5545991294914"
+  );
+
+  useEffect(() => {
+    void fetch("/api/store-settings", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (
+          typeof data.whatsappUrl === "string" &&
+          data.whatsappUrl.startsWith("https://")
+        ) {
+          setWhatsappUrl(data.whatsappUrl);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const copy = async () => {
     await navigator.clipboard.writeText(order.orderNumber);
     setCopied(true);
@@ -33,7 +50,7 @@ export function OrderSuccess({ order }: { order: Order }) {
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <a href={orderWhatsAppUrl(order)} target="_blank" rel="noreferrer" className="rounded-lg bg-[#25d366] px-4 py-4 text-center text-xs font-black text-black hover:bg-[#4ade80]">FINALIZAR PELO WHATSAPP</a>
+          <a href={orderWhatsAppUrl(order, whatsappUrl)} target="_blank" rel="noreferrer" className="rounded-lg bg-[#25d366] px-4 py-4 text-center text-xs font-black text-black hover:bg-[#4ade80]">FINALIZAR PELO WHATSAPP</a>
           <button onClick={copy} className="rounded-lg border border-white/20 px-4 py-4 text-xs font-black hover:bg-white hover:text-black">{copied ? "NÚMERO COPIADO" : "COPIAR NÚMERO DO PEDIDO"}</button>
           <Link href="/" className="rounded-lg border border-white/20 px-4 py-4 text-center text-xs font-black hover:bg-white hover:text-black">VOLTAR PARA A LOJA</Link>
         </div>

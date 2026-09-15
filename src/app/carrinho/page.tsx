@@ -1,10 +1,37 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { ProductVisual } from "../components/ProductCard";
 import { useCart } from "../CartProvider";
 import { formatPrice } from "../data";
 
-export default function CartPage() { const { items, increase, decrease, removeItem, subtotal } = useCart(); const discount = subtotal > 700 ? subtotal * .1 : 0; const shipping = subtotal === 0 || subtotal > 500 ? 0 : 29.9; const total = subtotal - discount + shipping; return <><Header /><main className="mx-auto min-h-[70vh] w-full max-w-7xl px-5 py-12 lg:px-8 lg:py-16"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.3em] text-red-500">Sua seleção</p><h1 className="mt-3 text-4xl font-black md:text-6xl">Carrinho</h1></div><Link href="/#catalogo" className="text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-white">Continuar comprando ↗</Link></div>{items.length === 0 ? <div className="mt-16 border border-dashed border-white/15 py-20 text-center"><p className="text-lg font-bold">Seu carrinho está vazio.</p><Link href="/#catalogo" className="mt-5 inline-block rounded-lg bg-red-600 px-5 py-3 text-xs font-black">VER PRODUTOS</Link></div> : <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_360px]"><div className="grid gap-5">{items.map((item) => <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5"><div className="w-28 shrink-0"><ProductVisual product={item} /></div><div className="flex min-w-0 flex-1 flex-col justify-between"><div><h2 className="font-bold">{item.name}</h2><p className="mt-1 text-xs text-zinc-500">{item.presentation}</p></div><div className="mt-4 flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={() => decrease(item.id)} className="h-7 w-7 rounded border border-white/15">−</button><span className="text-sm">{item.quantity}</span><button onClick={() => increase(item.id)} className="h-7 w-7 rounded border border-white/15">+</button></div><span className="font-bold">{formatPrice(item.price * item.quantity)}</span></div></div><button onClick={() => removeItem(item.id)} className="self-start text-zinc-600 hover:text-red-400" aria-label={`Remover ${item.name}`}>×</button></div>)}</div><aside className="h-fit rounded-2xl border border-white/10 bg-[#101216] p-6"><h2 className="text-lg font-black">Resumo do pedido</h2><div className="mt-6 grid gap-4 border-b border-white/10 pb-6 text-sm"><div className="flex justify-between text-zinc-400"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div><div className="flex justify-between text-zinc-400"><span>Desconto demonstrativo</span><span className="text-emerald-400">-{formatPrice(discount)}</span></div><div className="flex justify-between text-zinc-400"><span>Envio</span><span>{shipping === 0 ? "Grátis" : formatPrice(shipping)}</span></div></div><div className="mt-6 flex justify-between text-lg font-black"><span>Total</span><span>{formatPrice(total)}</span></div><Link href="/checkout" className="mt-6 block rounded-lg bg-red-600 px-5 py-4 text-center text-xs font-black tracking-wider hover:bg-red-500">FINALIZAR PEDIDO</Link></aside></div>}</main><Footer /></>; }
+export default function CartPage() {
+  const { items, increase, decrease, removeItem, subtotal } = useCart();
+  const [shippingFee, setShippingFee] = useState(34.99);
+  const [freeShippingFrom, setFreeShippingFrom] = useState(1000);
+
+  useEffect(() => {
+    void fetch("/api/store-settings", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (typeof data.shippingFee === "number") {
+          setShippingFee(data.shippingFee);
+        }
+
+        if (typeof data.freeShippingFrom === "number") {
+          setFreeShippingFrom(data.freeShippingFrom);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const discount = subtotal > 700 ? subtotal * .1 : 0;
+  const shipping =
+    subtotal === 0 || subtotal >= freeShippingFrom ? 0 : shippingFee;
+  const amountToFreeShipping = Math.max(0, freeShippingFrom - subtotal);
+  const total = subtotal - discount + shipping;
+
+  return <><Header /><main className="mx-auto min-h-[70vh] w-full max-w-7xl px-5 py-12 lg:px-8 lg:py-16"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.3em] text-red-500">Sua seleção</p><h1 className="mt-3 text-4xl font-black md:text-6xl">Carrinho</h1></div><Link href="/#catalogo" className="text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-white">Continuar comprando ↗</Link></div>{items.length === 0 ? <div className="mt-16 border border-dashed border-white/15 py-20 text-center"><p className="text-lg font-bold">Seu carrinho está vazio.</p><Link href="/#catalogo" className="mt-5 inline-block rounded-lg bg-red-600 px-5 py-3 text-xs font-black">VER PRODUTOS</Link></div> : <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_360px]"><div className="grid gap-5">{items.map((item) => <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5"><div className="w-28 shrink-0"><ProductVisual product={item} /></div><div className="flex min-w-0 flex-1 flex-col justify-between"><div><h2 className="font-bold">{item.name}</h2><p className="mt-1 text-xs text-zinc-500">{item.presentation}</p></div><div className="mt-4 flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={() => decrease(item.id)} className="h-7 w-7 rounded border border-white/15">−</button><span className="text-sm">{item.quantity}</span><button onClick={() => increase(item.id)} className="h-7 w-7 rounded border border-white/15">+</button></div><span className="font-bold">{formatPrice(item.price * item.quantity)}</span></div></div><button onClick={() => removeItem(item.id)} className="self-start text-zinc-600 hover:text-red-400" aria-label={`Remover ${item.name}`}>×</button></div>)}</div><aside className="h-fit rounded-2xl border border-white/10 bg-[#101216] p-6"><h2 className="text-lg font-black">Resumo do pedido</h2><div className="mt-6 grid gap-4 border-b border-white/10 pb-6 text-sm"><div className="flex justify-between text-zinc-400"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div><div className="flex justify-between text-zinc-400"><span>Desconto demonstrativo</span><span className="text-emerald-400">-{formatPrice(discount)}</span></div><div className="flex justify-between text-zinc-400"><span>Envio</span><span>{shipping === 0 ? "Grátis" : formatPrice(shipping)}</span></div><div className={`rounded-lg border px-3 py-3 text-xs font-bold ${subtotal >= freeShippingFrom ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-white/10 bg-white/[.03] text-zinc-400"}`}>{subtotal >= freeShippingFrom ? "🎉 Você ganhou FRETE GRÁTIS!" : `Faltam ${formatPrice(amountToFreeShipping)} para você ganhar FRETE GRÁTIS.`}</div></div><div className="mt-6 flex justify-between text-lg font-black"><span>Total</span><span>{formatPrice(total)}</span></div><Link href="/checkout" className="mt-6 block rounded-lg bg-red-600 px-5 py-4 text-center text-xs font-black tracking-wider hover:bg-red-500">FINALIZAR PEDIDO</Link></aside></div>}</main><Footer /></>; }

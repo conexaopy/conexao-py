@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseServerClient } from "./server";
+import { getStoreSettings } from "./storeSettings";
 import type { Address, Customer, Order, OrderItem } from "../../app/orderTypes";
 
 type CartInput = { id: string; quantity: number };
@@ -36,7 +37,11 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<Orde
   });
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = subtotal > 700 ? subtotal * .1 : 0;
-  const shipping = subtotal === 0 || subtotal > 500 ? 0 : 29.9;
+  const storeSettings = await getStoreSettings();
+  const shipping =
+    subtotal === 0 || subtotal >= storeSettings.freeShippingFrom
+      ? 0
+      : storeSettings.shippingFee;
   const total = subtotal - discount + shipping;
   const { data: orderNumbers, error: numbersError } = await client.from("orders").select("order_number").order("created_at", { ascending: false }).limit(1000);
   if (numbersError) throw new Error("Não foi possível gerar o número do pedido.");

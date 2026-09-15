@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "../CartProvider";
 import { formatPrice } from "../data";
 import { saveOrder } from "../orderStore";
@@ -26,9 +26,28 @@ export function CheckoutForm() {
   const [submitted, setSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [shippingFee, setShippingFee] = useState(34.99);
+  const [freeShippingFrom, setFreeShippingFrom] = useState(1000);
   const cepRequest = useRef("");
+
+  useEffect(() => {
+    void fetch("/api/store-settings", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (typeof data.shippingFee === "number") {
+          setShippingFee(data.shippingFee);
+        }
+
+        if (typeof data.freeShippingFrom === "number") {
+          setFreeShippingFrom(data.freeShippingFrom);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const discount = subtotal > 700 ? subtotal * .1 : 0;
-  const shipping = subtotal === 0 || subtotal > 500 ? 0 : 29.9;
+  const shipping =
+    subtotal === 0 || subtotal >= freeShippingFrom ? 0 : shippingFee;
   const total = subtotal - discount + shipping;
 
   const setError = (key: FieldKey, message?: string) => setErrors((current) => {
