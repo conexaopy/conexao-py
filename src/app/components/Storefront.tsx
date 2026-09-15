@@ -1,13 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Product } from "../data";
 import { ProductCard } from "./ProductCard";
 
 const categories = ["Todos", "Tirzepatida", "Retatrutida", "Peptídeos", "Anabolizantes"] as const;
 
 export function Storefront({ products }: { products: Product[] }) {
-  const [active, setActive] = useState<typeof categories[number]>("Todos");
+  const searchParams = useSearchParams();
+  const requestedCategory = searchParams.get("categoria");
+
+  const urlCategory =
+    categories.find(
+      (category) =>
+        category !== "Todos" &&
+        category.toLocaleLowerCase("pt-BR") ===
+          requestedCategory?.toLocaleLowerCase("pt-BR"),
+    ) ?? "Todos";
+
+  const [manualCategory, setManualCategory] =
+    useState<typeof categories[number] | null>(null);
+
+  const active = requestedCategory ? urlCategory : (manualCategory ?? "Todos");
+
+  const setActive = (category: typeof categories[number]) => {
+    setManualCategory(category);
+  };
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Todos");
   const [sort, setSort] = useState("default");

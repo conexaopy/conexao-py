@@ -54,7 +54,7 @@ export function Header() {
             <Link
               key={link}
               className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white"
-              href={`/?categoria=${encodeURIComponent(link)}`}
+              href={`/?categoria=${encodeURIComponent(link)}#catalogo`}
             >
               {link}
             </Link>
@@ -113,7 +113,7 @@ export function Header() {
             {links.map((link) => (
               <Link
                 key={link}
-                href={`/?categoria=${encodeURIComponent(link)}`}
+                href={`/?categoria=${encodeURIComponent(link)}#catalogo`}
                 onClick={() => setOpen(false)}
                 className="text-sm font-bold uppercase text-zinc-400"
               >
