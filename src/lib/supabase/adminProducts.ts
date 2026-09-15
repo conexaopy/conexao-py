@@ -73,3 +73,56 @@ export async function updateAdminProduct(id: string, body: Partial<ProductInput>
   if (error) throw new Error("Não foi possível atualizar o produto.");
   return data;
 }
+
+export async function bulkUpdateAdminProducts(
+  ids: string[],
+  changes: {
+    active?: boolean;
+    stock_quantity?: number;
+  },
+) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error("Selecione pelo menos um produto.");
+  }
+
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+  if (uniqueIds.length === 0) {
+    throw new Error("Nenhum produto válido foi selecionado.");
+  }
+
+  const update: {
+    active?: boolean;
+    stock_quantity?: number;
+  } = {};
+
+  if (typeof changes.active === "boolean") {
+    update.active = changes.active;
+  }
+
+  if (changes.stock_quantity !== undefined) {
+    const stock = Number(changes.stock_quantity);
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      throw new Error("O estoque deve ser um inteiro maior ou igual a zero.");
+    }
+
+    update.stock_quantity = stock;
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new Error("Nenhuma alteração foi informada.");
+  }
+
+  const { data, error } = await getSupabaseServerClient()
+    .from("products")
+    .update(update)
+    .in("id", uniqueIds)
+    .select("id,active,stock_quantity");
+
+  if (error) {
+    throw new Error("Não foi possível atualizar os produtos selecionados.");
+  }
+
+  return data ?? [];
+}

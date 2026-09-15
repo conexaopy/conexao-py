@@ -91,6 +91,7 @@ export function AdminProducts() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
   const [form, setForm] = useState<Form>(emptyForm);
   const [editing, setEditing] = useState<string | null>(null);
@@ -393,6 +394,79 @@ const removeImage = () => {
     setError(
       result.error ?? "Não foi possível atualizar o produto.",
     );
+  };
+
+  const bulkUpdate = async (
+    changes: {
+      active?: boolean;
+      stock_quantity?: number;
+    },
+  ) => {
+    if (selectedProducts.length === 0) {
+      setError("Selecione pelo menos um produto.");
+      return;
+    }
+
+    setError("");
+    setNotice("");
+
+    const response = await fetch("/api/admin/products/bulk", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ids: selectedProducts,
+        changes,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(
+        result.error ??
+          "Não foi possível atualizar os produtos selecionados.",
+      );
+      return;
+    }
+
+    setNotice(
+      `${result.updated} produto${
+        result.updated === 1 ? "" : "s"
+      } atualizado${result.updated === 1 ? "" : "s"} com sucesso.`,
+    );
+
+    setSelectedProducts([]);
+    await load();
+  };
+
+  const setBulkStock = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Selecione pelo menos um produto.");
+      return;
+    }
+
+    const value = window.prompt(
+      `Definir estoque para ${selectedProducts.length} produto${
+        selectedProducts.length === 1 ? "" : "s"
+      }:`,
+    );
+
+    if (value === null) {
+      return;
+    }
+
+    const stock = Number(value);
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      setError("Digite uma quantidade inteira maior ou igual a zero.");
+      return;
+    }
+
+    await bulkUpdate({
+      stock_quantity: stock,
+    });
   };
 
   const logout = async () => {
@@ -834,6 +908,51 @@ const removeImage = () => {
             </select>
           </div>
 
+          {selectedProducts.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#101216] p-4">
+              <div className="mr-auto">
+                <p className="text-xs font-black uppercase tracking-wider text-white">
+                  {selectedProducts.length} produto{selectedProducts.length === 1 ? "" : "s"} selecionado{selectedProducts.length === 1 ? "" : "s"}
+                </p>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  A ação será aplicada aos produtos marcados.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void bulkUpdate({ active: true })}
+                className="rounded-lg bg-emerald-500/10 px-4 py-2 text-xs font-black text-emerald-400 transition hover:bg-emerald-500/20"
+              >
+                ATIVAR
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void bulkUpdate({ active: false })}
+                className="rounded-lg bg-red-500/10 px-4 py-2 text-xs font-black text-red-400 transition hover:bg-red-500/20"
+              >
+                OCULTAR
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void setBulkStock()}
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white transition hover:bg-white/10"
+              >
+                DEFINIR ESTOQUE
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedProducts([])}
+                className="rounded-lg px-4 py-2 text-xs font-bold text-zinc-500 transition hover:bg-white/5 hover:text-white"
+              >
+                LIMPAR
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <p className="mt-8 text-sm text-zinc-500">
               Carregando produtos...
@@ -843,6 +962,30 @@ const removeImage = () => {
               <table className="w-full min-w-[1150px] text-left text-sm">
                 <thead className="bg-[#101216] text-xs uppercase tracking-wider text-zinc-500">
                   <tr>
+                    <th className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={
+                          products.length > 0 &&
+                          products.every((product) =>
+                            selectedProducts.includes(product.id),
+                          )
+                        }
+                        onChange={(event) => {
+                          if (event.target.checked) {
+                            setSelectedProducts(
+                              products.map((product) => product.id),
+                            );
+                          } else {
+                            setSelectedProducts([]);
+                          }
+                        }}
+                        className="h-4 w-4 cursor-pointer accent-red-600"
+                        title="Selecionar todos"
+                        aria-label="Selecionar todos os produtos"
+                      />
+                    </th>
+
                     {[
                       "Imagem",
                       "Nome",
@@ -869,7 +1012,34 @@ const removeImage = () => {
 
                 <tbody className="divide-y divide-white/10">
                   {products.map((product) => (
-                    <tr key={product.id}>
+                    <tr
+                      key={product.id}
+                      className={
+                        selectedProducts.includes(product.id)
+                          ? "bg-white/[0.03]"
+                          : ""
+                      }
+                    >
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.includes(product.id)}
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              setSelectedProducts((current) => [
+                                ...new Set([...current, product.id]),
+                              ]);
+                            } else {
+                              setSelectedProducts((current) =>
+                                current.filter((id) => id !== product.id),
+                              );
+                            }
+                          }}
+                          className="h-4 w-4 cursor-pointer accent-red-600"
+                          aria-label={`Selecionar ${product.name}`}
+                        />
+                      </td>
+
                       <td className="px-4 py-4">
                         {product.image_url ? (
                           <Image
