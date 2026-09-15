@@ -915,7 +915,65 @@ const removeImage = () => {
                       </td>
 
                       <td className="px-4 py-4">
-                        {product.stock_quantity}
+                        <div className="inline-flex items-center overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                          <button
+                            type="button"
+                            disabled={product.stock_quantity <= 0}
+                            onClick={() =>
+                              void quickUpdate(product, {
+                                stock_quantity: Math.max(
+                                  0,
+                                  product.stock_quantity - 1,
+                                ),
+                              })
+                            }
+                            className="flex h-9 w-9 items-center justify-center text-lg font-bold text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25"
+                            title="Diminuir estoque"
+                          >
+                            −
+                          </button>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={product.stock_quantity}
+                            key={`${product.id}-${product.stock_quantity}`}
+                            onBlur={(event) => {
+                              const quantity = Math.max(
+                                0,
+                                Math.floor(Number(event.target.value) || 0),
+                              );
+
+                              if (quantity !== product.stock_quantity) {
+                                void quickUpdate(product, {
+                                  stock_quantity: quantity,
+                                });
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.currentTarget.blur();
+                              }
+                            }}
+                            className="h-9 w-16 border-x border-white/10 bg-transparent text-center text-xs font-black text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            title="Digite a quantidade em estoque"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void quickUpdate(product, {
+                                stock_quantity:
+                                  product.stock_quantity + 1,
+                              })
+                            }
+                            className="flex h-9 w-9 items-center justify-center text-lg font-bold text-emerald-400 transition hover:bg-emerald-500/10"
+                            title="Aumentar estoque"
+                          >
+                            +
+                          </button>
+                        </div>
                       </td>
 
                       <td className="px-4 py-4 text-xs">
