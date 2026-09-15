@@ -34,7 +34,7 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
   if (!adminStatuses.includes(status as OrderStatus)) throw new Error("Status inválido.");
   const client = getSupabaseServerClient();
   const payload: Record<string, string | null> = { status };
-  if (status === "RASTREIO DISPONÍVEL") {
+  if (status === "ENVIADO" || status === "RASTREIO DISPONÍVEL") {
     payload.carrier = tracking?.carrier?.trim() || null;
     payload.tracking_code = tracking?.trackingCode?.trim() || null;
     payload.tracking_url = tracking?.trackingUrl?.trim() || null;
