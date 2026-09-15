@@ -32,14 +32,68 @@ export async function getAdminOrder(id: string) {
 
 export async function updateAdminOrder(id: string, status: string, tracking?: { carrier?: string; trackingCode?: string; trackingUrl?: string }) {
   if (!adminStatuses.includes(status as OrderStatus)) throw new Error("Status inválido.");
+
   const client = getSupabaseServerClient();
+
+  const { data: currentOrder, error: currentError } = await client
+    .from("orders")
+    .select("status,stock_reserved")
+    .eq("id", id)
+    .single();
+
+  if (currentError || !currentOrder) {
+    throw new Error("Não foi possível carregar o pedido.");
+  }
+
+  if (status === "CANCELADO") {
+    const { error: stockError } = await client.rpc(
+      "release_order_stock",
+      {
+        p_order_id: id,
+      },
+    );
+
+    if (stockError) {
+      throw new Error("Não foi possível devolver o estoque do pedido.");
+    }
+  } else if (
+    currentOrder.status === "CANCELADO" &&
+    !currentOrder.stock_reserved
+  ) {
+    const { error: stockError } = await client.rpc(
+      "reserve_order_stock",
+      {
+        p_order_id: id,
+      },
+    );
+
+    if (stockError) {
+      throw new Error(
+        stockError.message.includes("Estoque insuficiente")
+          ? "Não há estoque suficiente para reativar este pedido."
+          : "Não foi possível reservar novamente o estoque do pedido.",
+      );
+    }
+  }
+
   const payload: Record<string, string | null> = { status };
+
   if (status === "ENVIADO" || status === "RASTREIO DISPONÍVEL") {
     payload.carrier = tracking?.carrier?.trim() || null;
     payload.tracking_code = tracking?.trackingCode?.trim() || null;
     payload.tracking_url = tracking?.trackingUrl?.trim() || null;
   }
-  const { data, error } = await client.from("orders").update(payload).eq("id", id).select(detailFields).single();
-  if (error) throw new Error("Não foi possível atualizar o pedido.");
+
+  const { data, error } = await client
+    .from("orders")
+    .update(payload)
+    .eq("id", id)
+    .select(detailFields)
+    .single();
+
+  if (error) {
+    throw new Error("Não foi possível atualizar o pedido.");
+  }
+
   return data;
 }

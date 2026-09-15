@@ -62,6 +62,39 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<Orde
   const itemPayload = orderItems.map((item) => ({ order_id: savedOrder.id, product_id: item.id, product_name: item.name, product_presentation: item.presentation, quantity: item.quantity, unit_price: item.price }));
   const { error: itemsError } = await client.from("order_items").insert(itemPayload);
   if (itemsError) { await client.from("orders").delete().eq("id", savedOrder.id); if (createdCustomer && customerId) await client.from("customers").delete().eq("id", customerId); throw new Error("Não foi possível salvar os itens do pedido."); }
+
+  const { error: stockError } = await client.rpc(
+    "reserve_order_stock",
+    {
+      p_order_id: savedOrder.id,
+    },
+  );
+
+  if (stockError) {
+    await client
+      .from("order_items")
+      .delete()
+      .eq("order_id", savedOrder.id);
+
+    await client
+      .from("orders")
+      .delete()
+      .eq("id", savedOrder.id);
+
+    if (createdCustomer && customerId) {
+      await client
+        .from("customers")
+        .delete()
+        .eq("id", customerId);
+    }
+
+    throw serverError(
+      stockError.message.includes("Estoque insuficiente")
+        ? "Um ou mais produtos ficaram sem estoque. Atualize o carrinho e tente novamente."
+        : "Não foi possível reservar o estoque do pedido.",
+    );
+  }
+
   return orderFromRow(savedOrder, orderItems);
 }
 
