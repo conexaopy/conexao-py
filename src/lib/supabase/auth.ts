@@ -20,5 +20,19 @@ export async function getSupabaseAuthServerClient() {
 export async function getAuthenticatedUser() {
   const client = await getSupabaseAuthServerClient();
   const { data: { user } } = await client.auth.getUser();
+
+  if (!user) return null;
+
+  const adminUserId = process.env.ADMIN_USER_ID;
+
+  if (!adminUserId) {
+    console.error("ADMIN_USER_ID não configurado.");
+    return null;
+  }
+
+  if (user.id !== adminUserId) {
+    return null;
+  }
+
   return user;
 }

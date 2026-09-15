@@ -25,13 +25,14 @@ export async function findPublicOrder(orderNumber: string, identifier: string) {
   };
 }
 
-export async function findOrderConfirmation(orderId: string) {
+export async function findOrderConfirmation(confirmationToken: string, orderNumber: string) {
   const client = getSupabaseServerClient();
 
   const { data: order, error } = await client
     .from("orders")
     .select("id,order_number,created_at,customer_name,customer_cpf,customer_whatsapp,customer_email,delivery_cep,delivery_street,delivery_number,delivery_complement,delivery_neighborhood,delivery_city,delivery_state,status,subtotal,discount,shipping,total")
-    .eq("id", orderId)
+    .eq("confirmation_token", confirmationToken)
+    .eq("order_number", orderNumber)
     .maybeSingle();
 
   if (error) throw new Error("Não foi possível carregar a confirmação do pedido.");
@@ -40,7 +41,7 @@ export async function findOrderConfirmation(orderId: string) {
   const { data: items, error: itemsError } = await client
     .from("order_items")
     .select("product_id,product_name,product_presentation,quantity,unit_price")
-    .eq("order_id", orderId);
+    .eq("order_id", order.id);
 
   if (itemsError) throw new Error("Não foi possível carregar os itens do pedido.");
 

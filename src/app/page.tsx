@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { Storefront } from "./components/Storefront";
@@ -14,7 +15,9 @@ export default async function Home() {
     <>
       <Header />
 
-      <Storefront products={products} />
+      <Suspense fallback={<div className="min-h-[60vh]" />}>
+        <Storefront products={products} />
+      </Suspense>
 
       <a
         href={settings.whatsappUrl}

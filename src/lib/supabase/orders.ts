@@ -13,17 +13,20 @@ const orderStatus = "AGUARDANDO PAGAMENTO" as const;
 function serverError(message: string): Error & { status?: number } { const error = new Error(message) as Error & { status?: number }; error.status = 400; return error; }
 function nextOrderNumber(values: string[]): string { const numbers = values.map((value) => Number(value.replace("CPY-", ""))).filter(Number.isFinite); return `CPY-${Math.max(1000, ...numbers) + 1}`; }
 
-export async function createSupabaseOrder(input: CreateOrderInput): Promise<Order> {
+export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ order: Order; confirmationToken: string }> {
   const client = getSupabaseServerClient();
   if (!input.requestId || !input.items.length) throw serverError("Carrinho vazio.");
   if (!input.customer.name.trim() || !input.customer.cpf || !input.customer.whatsapp || !input.customer.email || !input.address.cep || !input.address.street || !input.address.number || !input.address.neighborhood || !input.address.city || !input.address.state) throw serverError("Dados obrigatórios incompletos.");
 
-  const { data: existingOrder, error: existingError } = await client.from("orders").select("id,order_number,customer_name,customer_cpf,customer_whatsapp,customer_email,delivery_cep,delivery_street,delivery_number,delivery_complement,delivery_neighborhood,delivery_city,delivery_state,status,subtotal,discount,shipping,total,created_at").eq("id", input.requestId).maybeSingle();
+  const { data: existingOrder, error: existingError } = await client.from("orders").select("id,order_number,customer_name,customer_cpf,customer_whatsapp,customer_email,delivery_cep,delivery_street,delivery_number,delivery_complement,delivery_neighborhood,delivery_city,delivery_state,status,subtotal,discount,shipping,total,created_at,confirmation_token").eq("id", input.requestId).maybeSingle();
   if (existingError) throw new Error("Não foi possível verificar o pedido.");
   if (existingOrder) {
     const { data: existingItems, error: existingItemsError } = await client.from("order_items").select("product_id,product_name,product_presentation,quantity,unit_price").eq("order_id", existingOrder.id);
     if (existingItemsError) throw new Error("Não foi possível recuperar o pedido existente.");
-    return orderFromRow(existingOrder, (existingItems ?? []).map((item) => ({ id: String(item.product_id ?? item.product_name), name: item.product_name, presentation: item.product_presentation ?? "Apresentação não informada", quantity: item.quantity, price: Number(item.unit_price), accent: "#d93636" })));
+    return {
+      order: orderFromRow(existingOrder, (existingItems ?? []).map((item) => ({ id: String(item.product_id ?? item.product_name), name: item.product_name, presentation: item.product_presentation ?? "Apresentação não informada", quantity: item.quantity, price: Number(item.unit_price), accent: "#d93636" }))),
+      confirmationToken: String(existingOrder.confirmation_token),
+    };
   }
 
   const uniqueIds = [...new Set(input.items.map((item) => item.id))];
@@ -110,7 +113,10 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<Orde
     );
   }
 
-  return orderFromRow(savedOrder, orderItems);
+  return {
+    order: orderFromRow(savedOrder, orderItems),
+    confirmationToken: String(savedOrder.confirmation_token),
+  };
 }
 
 function orderFromRow(row: Record<string, unknown>, items: OrderItem[]): Order { return { id: String(row.id), orderNumber: String(row.order_number), createdAt: String(row.created_at), status: row.status as Order["status"], customer: { name: String(row.customer_name), cpf: String(row.customer_cpf), whatsapp: String(row.customer_whatsapp), email: String(row.customer_email) }, address: { cep: String(row.delivery_cep), street: String(row.delivery_street), number: String(row.delivery_number), complement: String(row.delivery_complement ?? ""), neighborhood: String(row.delivery_neighborhood), city: String(row.delivery_city), state: String(row.delivery_state) }, items, subtotal: Number(row.subtotal), discount: Number(row.discount), shipping: Number(row.shipping), total: Number(row.total) }; }

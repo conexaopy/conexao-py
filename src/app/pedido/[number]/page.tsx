@@ -10,14 +10,14 @@ import type { Order } from "../../orderTypes";
 export default function OrderPage() {
   const { number } = useParams<{ number: string }>();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get("id");
+  const confirmationToken = searchParams.get("token");
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!confirmationToken) return;
 
     void fetch("/api/order-confirmation", {
       method: "POST",
@@ -25,7 +25,7 @@ export default function OrderPage() {
         "Content-Type": "application/json",
       },
       cache: "no-store",
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify({ confirmationToken, orderNumber: number }),
     })
       .then(async (response) => {
         const data = await response.json();
@@ -52,9 +52,9 @@ export default function OrderPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [number, orderId]);
+  }, [number, confirmationToken]);
 
-  if (!orderId) {
+  if (!confirmationToken) {
     return (
       <>
         <Header />

@@ -8,12 +8,17 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const orderId =
-      typeof body.orderId === "string"
-        ? body.orderId.trim()
+    const confirmationToken =
+      typeof body.confirmationToken === "string"
+        ? body.confirmationToken.trim()
         : "";
 
-    if (!orderId) {
+    const orderNumber =
+      typeof body.orderNumber === "string"
+        ? body.orderNumber.trim()
+        : "";
+
+    if (!confirmationToken || !orderNumber) {
       return NextResponse.json(
         { error: "Identificação do pedido ausente." },
         {
@@ -23,7 +28,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const order = await findOrderConfirmation(orderId);
+    const order = await findOrderConfirmation(confirmationToken, orderNumber);
 
     if (!order) {
       return NextResponse.json(

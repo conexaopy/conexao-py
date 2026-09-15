@@ -143,11 +143,11 @@ export function CheckoutForm() {
       const requestId = orderRequestId.current;
 
       const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, customer: { ...customer, cpf: normalizeDigits(customer.cpf), whatsapp: normalizeDigits(customer.whatsapp) }, address: { ...address, cep: normalizeDigits(address.cep), state: address.state.toUpperCase() }, items: items.map(({ id, quantity }) => ({ id, quantity })) }) });
-      const result = await response.json() as { ok: boolean; order?: import("../orderTypes").Order; error?: string };
-      if (!response.ok || !result.ok || !result.order) throw new Error(result.error ?? "Não foi possível criar o pedido.");
+      const result = await response.json() as { ok: boolean; order?: import("../orderTypes").Order; confirmationToken?: string; error?: string };
+      if (!response.ok || !result.ok || !result.order || !result.confirmationToken) throw new Error(result.error ?? "Não foi possível criar o pedido.");
       saveOrder(result.order);
       clearCart();
-      router.push(`/pedido/${result.order.orderNumber}?id=${encodeURIComponent(requestId)}`);
+      router.push(`/pedido/${result.order.orderNumber}?token=${encodeURIComponent(result.confirmationToken)}`);
     } catch (error) {
       setError("cart", error instanceof Error ? error.message : "Não foi possível criar o pedido.");
       setProcessing(false);
