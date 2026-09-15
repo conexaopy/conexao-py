@@ -12,7 +12,7 @@ export async function findPublicOrder(orderNumber: string, identifier: string) {
   const { data: history, error: historyError } = await client
     .from("orders")
     .select("order_number,created_at,customer_name,status,total,carrier,tracking_code,tracking_url")
-    .eq("customer_cpf", digits)
+    .or(`customer_cpf.eq.${digits},customer_whatsapp.eq.${digits}`)
     .order("created_at", { ascending: false });
 
   if (historyError) {

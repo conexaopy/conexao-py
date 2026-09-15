@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseOrder } from "../../../lib/supabase/orders";
+import { validateOrderInput } from "../../../lib/supabase/orderValidation";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { order, confirmationToken } = await createSupabaseOrder(body);
+    const input = validateOrderInput(body);
+    const { order, confirmationToken } = await createSupabaseOrder(input);
     return NextResponse.json({
       ok: true,
       order,
