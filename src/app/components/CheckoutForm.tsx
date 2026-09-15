@@ -29,6 +29,7 @@ export function CheckoutForm() {
   const [shippingFee, setShippingFee] = useState(34.99);
   const [freeShippingFrom, setFreeShippingFrom] = useState(1000);
   const cepRequest = useRef("");
+  const orderRequestId = useRef<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/store-settings", { cache: "no-store" })
@@ -135,12 +136,18 @@ export function CheckoutForm() {
     }
     setProcessing(true);
     try {
-      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: crypto.randomUUID(), customer: { ...customer, cpf: normalizeDigits(customer.cpf), whatsapp: normalizeDigits(customer.whatsapp) }, address: { ...address, cep: normalizeDigits(address.cep), state: address.state.toUpperCase() }, items: items.map(({ id, quantity }) => ({ id, quantity })) }) });
+      if (!orderRequestId.current) {
+        orderRequestId.current = crypto.randomUUID();
+      }
+
+      const requestId = orderRequestId.current;
+
+      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, customer: { ...customer, cpf: normalizeDigits(customer.cpf), whatsapp: normalizeDigits(customer.whatsapp) }, address: { ...address, cep: normalizeDigits(address.cep), state: address.state.toUpperCase() }, items: items.map(({ id, quantity }) => ({ id, quantity })) }) });
       const result = await response.json() as { ok: boolean; order?: import("../orderTypes").Order; error?: string };
       if (!response.ok || !result.ok || !result.order) throw new Error(result.error ?? "Não foi possível criar o pedido.");
       saveOrder(result.order);
       clearCart();
-      router.push(`/pedido/${result.order.orderNumber}`);
+      router.push(`/pedido/${result.order.orderNumber}?id=${encodeURIComponent(requestId)}`);
     } catch (error) {
       setError("cart", error instanceof Error ? error.message : "Não foi possível criar o pedido.");
       setProcessing(false);

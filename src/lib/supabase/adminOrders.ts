@@ -54,6 +54,10 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
     throw new Error("Não foi possível carregar o pedido.");
   }
 
+  const isReactivation =
+    currentOrder.status === "CANCELADO" &&
+    status !== "CANCELADO";
+
   if (status === "CANCELADO") {
     const { error: stockError } = await client.rpc(
       "release_order_stock",
@@ -65,14 +69,12 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
     if (stockError) {
       throw new Error("Não foi possível devolver o estoque do pedido.");
     }
-  } else if (
-    currentOrder.status === "CANCELADO" &&
-    !currentOrder.stock_reserved
-  ) {
+  } else if (isReactivation) {
     const { error: stockError } = await client.rpc(
-      "reserve_order_stock",
+      "reactivate_cancelled_order",
       {
         p_order_id: id,
+        p_status: status,
       },
     );
 
@@ -80,15 +82,18 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
       throw new Error(
         stockError.message.includes("Estoque insuficiente")
           ? "Não há estoque suficiente para reativar este pedido."
-          : "Não foi possível reservar novamente o estoque do pedido.",
+          : "Não foi possível reativar o pedido.",
       );
     }
   }
 
   const payload: Record<string, string | null> = {
-    status,
     notes: tracking?.notes?.trim() || null,
   };
+
+  if (!isReactivation) {
+    payload.status = status;
+  }
 
   if (status === "ENVIADO" || status === "RASTREIO DISPONÍVEL") {
     payload.carrier = tracking?.carrier?.trim() || null;
