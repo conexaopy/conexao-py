@@ -39,7 +39,7 @@ export async function getAdminOrder(id: string) {
   return { ...order, items: items ?? [], history: history ?? [] };
 }
 
-export async function updateAdminOrder(id: string, status: string, tracking?: { carrier?: string; trackingCode?: string; trackingUrl?: string }) {
+export async function updateAdminOrder(id: string, status: string, tracking?: { carrier?: string; trackingCode?: string; trackingUrl?: string; notes?: string }) {
   if (!adminStatuses.includes(status as OrderStatus)) throw new Error("Status inválido.");
 
   const client = getSupabaseServerClient();
@@ -85,7 +85,10 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
     }
   }
 
-  const payload: Record<string, string | null> = { status };
+  const payload: Record<string, string | null> = {
+    status,
+    notes: tracking?.notes?.trim() || null,
+  };
 
   if (status === "ENVIADO" || status === "RASTREIO DISPONÍVEL") {
     payload.carrier = tracking?.carrier?.trim() || null;
