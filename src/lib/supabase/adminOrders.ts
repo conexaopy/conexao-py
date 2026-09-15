@@ -27,7 +27,16 @@ export async function getAdminOrder(id: string) {
   if (!order) return null;
   const { data: items, error: itemsError } = await client.from("order_items").select("id,product_id,product_name,product_presentation,quantity,unit_price,total_price,created_at").eq("order_id", id).order("created_at");
   if (itemsError) throw new Error("Não foi possível carregar os itens do pedido.");
-  return { ...order, items: items ?? [] };
+
+  const { data: history, error: historyError } = await client
+    .from("order_status_history")
+    .select("id,status,created_at")
+    .eq("order_id", id)
+    .order("created_at", { ascending: true });
+
+  if (historyError) throw new Error("Não foi possível carregar o histórico do pedido.");
+
+  return { ...order, items: items ?? [], history: history ?? [] };
 }
 
 export async function updateAdminOrder(id: string, status: string, tracking?: { carrier?: string; trackingCode?: string; trackingUrl?: string }) {
@@ -93,6 +102,19 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
 
   if (error) {
     throw new Error("Não foi possível atualizar o pedido.");
+  }
+
+  if (currentOrder.status !== status) {
+    const { error: historyError } = await client
+      .from("order_status_history")
+      .insert({
+        order_id: id,
+        status,
+      });
+
+    if (historyError) {
+      console.error("Não foi possível registrar o histórico do pedido.", historyError);
+    }
   }
 
   return data;

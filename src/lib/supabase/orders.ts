@@ -95,6 +95,21 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<Orde
     );
   }
 
+  const { error: historyError } = await client
+    .from("order_status_history")
+    .insert({
+      order_id: savedOrder.id,
+      status: orderStatus,
+      created_at: savedOrder.created_at,
+    });
+
+  if (historyError) {
+    console.error(
+      "Não foi possível registrar o status inicial do pedido.",
+      historyError,
+    );
+  }
+
   return orderFromRow(savedOrder, orderItems);
 }
 
