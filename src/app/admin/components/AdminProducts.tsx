@@ -930,15 +930,42 @@ const removeImage = () => {
                               active: !product.active,
                             })
                           }
-                          className={
+                          title={
                             product.active
-                              ? "text-emerald-400"
-                              : "text-zinc-600"
+                              ? "Clique para ocultar o produto"
+                              : "Clique para exibir o produto"
                           }
+                          aria-label={
+                            product.active
+                              ? "Ocultar produto"
+                              : "Exibir produto"
+                          }
+                          className="group flex items-center gap-2"
                         >
-                          {product.active
-                            ? "ATIVO"
-                            : "INATIVO"}
+                          <span
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full border transition ${
+                              product.active
+                                ? "border-emerald-500/50 bg-emerald-500/25"
+                                : "border-white/10 bg-zinc-800"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 rounded-full transition-transform ${
+                                product.active
+                                  ? "translate-x-6 bg-emerald-400"
+                                  : "translate-x-1 bg-zinc-500"
+                              }`}
+                            />
+                          </span>
+                          <span
+                            className={`text-[10px] font-black ${
+                              product.active
+                                ? "text-emerald-400"
+                                : "text-zinc-600"
+                            }`}
+                          >
+                            {product.active ? "ON" : "OFF"}
+                          </span>
                         </button>
                       </td>
 
