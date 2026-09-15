@@ -18,17 +18,28 @@ export async function POST(request: Request) {
         ? body.orderNumber.trim()
         : "";
 
-    if (!confirmationToken || !orderNumber) {
+    const normalizedOrderNumber = orderNumber
+      .toUpperCase()
+      .replace(/^#/, "");
+
+    const validToken =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        confirmationToken,
+      );
+
+    const validOrderNumber = /^CPY-\d{1,12}$/.test(normalizedOrderNumber);
+
+    if (!validToken || !validOrderNumber) {
       return NextResponse.json(
-        { error: "Identificação do pedido ausente." },
+        { error: "Identificação do pedido inválida." },
         {
           status: 400,
-          headers: { "Cache-Control": "no-store" },
+          headers: { "Cache-Control": "no-store, max-age=0" },
         },
       );
     }
 
-    const order = await findOrderConfirmation(confirmationToken, orderNumber);
+    const order = await findOrderConfirmation(confirmationToken, normalizedOrderNumber);
 
     if (!order) {
       return NextResponse.json(
