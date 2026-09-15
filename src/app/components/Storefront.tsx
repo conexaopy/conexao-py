@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Product } from "../data";
 import { ProductCard } from "./ProductCard";
 
 const categories = ["Todos", "Tirzepatida", "Retatrutida", "Peptídeos", "Anabolizantes"] as const;
 
 export function Storefront({ products }: { products: Product[] }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedCategory = searchParams.get("categoria");
 
-  const urlCategory =
+  const active =
     categories.find(
       (category) =>
         category !== "Todos" &&
@@ -19,13 +20,21 @@ export function Storefront({ products }: { products: Product[] }) {
           requestedCategory?.toLocaleLowerCase("pt-BR"),
     ) ?? "Todos";
 
-  const [manualCategory, setManualCategory] =
-    useState<typeof categories[number] | null>(null);
-
-  const active = requestedCategory ? urlCategory : (manualCategory ?? "Todos");
-
   const setActive = (category: typeof categories[number]) => {
-    setManualCategory(category);
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (category === "Todos") {
+      params.delete("categoria");
+    } else {
+      params.set("categoria", category);
+    }
+
+    const query = params.toString();
+
+    router.replace(
+      query ? `/?${query}#catalogo` : "/#catalogo",
+      { scroll: false },
+    );
   };
 
   const [search, setSearch] = useState("");
