@@ -221,7 +221,9 @@ export function OrderSuccess({ order }: { order: Order }) {
               </div>
 
               <div className="flex justify-between">
-                <span className="text-zinc-500">Desconto</span>
+                <span className="text-zinc-500">
+                  {order.couponCode ? `Cupom ${order.couponCode}` : "Desconto"}
+                </span>
                 <span className="text-emerald-400">
                   -{formatPrice(order.discount)}
                 </span>

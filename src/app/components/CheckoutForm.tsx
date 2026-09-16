@@ -28,6 +28,13 @@ export function CheckoutForm() {
   const [cepLoading, setCepLoading] = useState(false);
   const [shippingFee, setShippingFee] = useState(34.99);
   const [freeShippingFrom, setFreeShippingFrom] = useState(1000);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMessage, setCouponMessage] = useState("");
   const cepRequest = useRef("");
   const orderRequestId = useRef<string | null>(null);
 
@@ -46,10 +53,16 @@ export function CheckoutForm() {
       .catch(() => {});
   }, []);
 
-  const discount = subtotal > 700 ? subtotal * .1 : 0;
+  const discount = appliedCoupon
+    ? appliedCoupon.discount
+    : subtotal > 700
+      ? Number((subtotal * 0.1).toFixed(2))
+      : 0;
+
   const shipping =
     subtotal === 0 || subtotal >= freeShippingFrom ? 0 : shippingFee;
-  const total = subtotal - discount + shipping;
+
+  const total = Math.max(0, subtotal - discount + shipping);
 
   const setError = (key: FieldKey, message?: string) => setErrors((current) => {
     const next = { ...current };
@@ -121,6 +134,64 @@ export function CheckoutForm() {
     }
   };
 
+  const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+
+    if (!code) {
+      setCouponMessage("Informe um cupom.");
+      setAppliedCoupon(null);
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponMessage("");
+
+    try {
+      const response = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          code,
+          subtotal,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok || !result.coupon) {
+        setAppliedCoupon(null);
+        setCouponMessage(
+          result.error ?? "Cupom inválido.",
+        );
+        return;
+      }
+
+      setAppliedCoupon({
+        code: result.coupon.code,
+        discount: Number(result.coupon.discount),
+      });
+
+      setCouponInput(result.coupon.code);
+      setCouponMessage(
+        `Cupom aplicado: -${formatPrice(Number(result.coupon.discount))}`,
+      );
+    } catch {
+      setAppliedCoupon(null);
+      setCouponMessage("Não foi possível validar o cupom.");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMessage("");
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (processing) return;
@@ -142,7 +213,10 @@ export function CheckoutForm() {
 
       const requestId = orderRequestId.current;
 
-      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, customer: { ...customer, cpf: normalizeDigits(customer.cpf), whatsapp: normalizeDigits(customer.whatsapp) }, address: { ...address, cep: normalizeDigits(address.cep), state: address.state.toUpperCase() }, items: items.map(({ id, quantity }) => ({ id, quantity })) }) });
+      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, customer: { ...customer, cpf: normalizeDigits(customer.cpf), whatsapp: normalizeDigits(customer.whatsapp) }, address: { ...address, cep: normalizeDigits(address.cep), state: address.state.toUpperCase() },
+        items: items.map(({ id, quantity }) => ({ id, quantity })),
+        couponCode: appliedCoupon?.code || undefined,
+      }) });
       const result = await response.json() as { ok: boolean; order?: import("../orderTypes").Order; confirmationToken?: string; error?: string };
       if (!response.ok || !result.ok || !result.order || !result.confirmationToken) throw new Error(result.error ?? "Não foi possível criar o pedido.");
       saveOrder(result.order);
@@ -159,7 +233,56 @@ export function CheckoutForm() {
   const addressInput = (label: string, key: keyof Address, placeholder: string, optional = false) => <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">{label}{optional && <span className="ml-1 font-normal normal-case text-zinc-600">(opcional)</span>}<input type="text" value={address[key]} onBlur={() => markTouched(key)} onChange={(event) => updateAddress(key, event.target.value)} placeholder={placeholder} inputMode={key === "cep" ? "numeric" : undefined} maxLength={key === "cep" ? 9 : key === "state" ? 2 : undefined} className={fieldClass} />{key === "cep" && cepLoading && <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-zinc-500">Consultando CEP...</span>}{errorFor(key)}</label>;
 
   if (!items.length && !processing) return <EmptyCheckout />;
-  return <form onSubmit={submit} className="grid gap-10 lg:grid-cols-[1fr_360px]"><div className="grid gap-8"><section className="border-t border-white/10 pt-6"><h2 className="text-xl font-black">Dados do cliente</h2><div className="mt-5 grid gap-5 md:grid-cols-2">{input("Nome completo", "name", "Seu nome")}{input("CPF", "cpf", "000.000.000-00", "numeric")}{input("WhatsApp", "whatsapp", "(00) 00000-0000", "numeric")}{input("E-mail", "email", "voce@email.com", "email")}</div></section><section className="border-t border-white/10 pt-6"><h2 className="text-xl font-black">Endereço de entrega</h2><div className="mt-5 grid gap-5 md:grid-cols-2">{addressInput("CEP", "cep", "00000-000")}{addressInput("Rua", "street", "Nome da rua")}{addressInput("Número", "number", "123")}{addressInput("Complemento", "complement", "Apto, bloco...", true)}{addressInput("Bairro", "neighborhood", "Seu bairro")}{addressInput("Cidade", "city", "Sua cidade")}{addressInput("Estado", "state", "PR")}</div></section></div><aside className="h-fit rounded-2xl border border-white/10 bg-[#101216] p-6 lg:sticky lg:top-24"><h2 className="text-lg font-black">Resumo do pedido</h2><div className="mt-5 grid gap-4 border-b border-white/10 pb-5">{items.map((item) => <div key={item.id} className="flex justify-between gap-3 text-sm"><span className="text-zinc-400">{item.quantity}x {item.name}<small className="block text-xs text-zinc-600">{formatPrice(item.price)} un.</small></span><span className="font-bold">{formatPrice(item.price * item.quantity)}</span></div>)}</div><div className="mt-5 grid gap-3 text-sm text-zinc-400"><div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div><div className="flex justify-between"><span>Desconto</span><span className="text-emerald-400">-{formatPrice(discount)}</span></div><div className="flex justify-between"><span>Envio</span><span>{shipping ? formatPrice(shipping) : "Grátis"}</span></div></div><div className="mt-5 flex justify-between border-t border-white/10 pt-5 text-lg font-black"><span>Total</span><span>{formatPrice(total)}</span></div><div className="mt-5 flex gap-2"><input placeholder="Cupom demonstrativo" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-xs outline-none" /><button type="button" className="rounded-lg border border-white/15 px-3 text-[10px] font-bold">APLICAR</button></div>{errorFor("cart")}<button disabled={processing} className="mt-5 w-full rounded-lg bg-red-600 px-5 py-4 text-xs font-black tracking-wider transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-60">{processing ? "GERANDO PEDIDO..." : "FINALIZAR PEDIDO"}</button></aside></form>;
+  return <form onSubmit={submit} className="grid gap-10 lg:grid-cols-[1fr_360px]"><div className="grid gap-8"><section className="border-t border-white/10 pt-6"><h2 className="text-xl font-black">Dados do cliente</h2><div className="mt-5 grid gap-5 md:grid-cols-2">{input("Nome completo", "name", "Seu nome")}{input("CPF", "cpf", "000.000.000-00", "numeric")}{input("WhatsApp", "whatsapp", "(00) 00000-0000", "numeric")}{input("E-mail", "email", "voce@email.com", "email")}</div></section><section className="border-t border-white/10 pt-6"><h2 className="text-xl font-black">Endereço de entrega</h2><div className="mt-5 grid gap-5 md:grid-cols-2">{addressInput("CEP", "cep", "00000-000")}{addressInput("Rua", "street", "Nome da rua")}{addressInput("Número", "number", "123")}{addressInput("Complemento", "complement", "Apto, bloco...", true)}{addressInput("Bairro", "neighborhood", "Seu bairro")}{addressInput("Cidade", "city", "Sua cidade")}{addressInput("Estado", "state", "PR")}</div></section></div><aside className="h-fit rounded-2xl border border-white/10 bg-[#101216] p-6 lg:sticky lg:top-24"><h2 className="text-lg font-black">Resumo do pedido</h2><div className="mt-5 grid gap-4 border-b border-white/10 pb-5">{items.map((item) => <div key={item.id} className="flex justify-between gap-3 text-sm"><span className="text-zinc-400">{item.quantity}x {item.name}<small className="block text-xs text-zinc-600">{formatPrice(item.price)} un.</small></span><span className="font-bold">{formatPrice(item.price * item.quantity)}</span></div>)}</div><div className="mt-5 grid gap-3 text-sm text-zinc-400"><div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div><div className="flex justify-between"><span>{appliedCoupon ? `Cupom ${appliedCoupon.code}` : "Desconto"}</span><span className="text-emerald-400">-{formatPrice(discount)}</span></div><div className="flex justify-between"><span>Envio</span><span>{shipping ? formatPrice(shipping) : "Grátis"}</span></div></div><div className="mt-5 flex justify-between border-t border-white/10 pt-5 text-lg font-black"><span>Total</span><span>{formatPrice(total)}</span></div><div className="mt-5">
+  <div className="flex gap-2">
+    <input
+      value={couponInput}
+      onChange={(event) => {
+        setCouponInput(event.target.value.toUpperCase());
+        if (appliedCoupon) {
+          setAppliedCoupon(null);
+          setCouponMessage("");
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void applyCoupon();
+        }
+      }}
+      placeholder="Cupom de desconto"
+      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-xs outline-none focus:border-red-500"
+      disabled={couponLoading}
+    />
+
+    <button
+      type="button"
+      onClick={() => void applyCoupon()}
+      disabled={couponLoading || !couponInput.trim()}
+      className="rounded-lg border border-white/15 px-3 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {couponLoading ? "..." : appliedCoupon ? "APLICADO" : "APLICAR"}
+    </button>
+  </div>
+
+  {couponMessage && (
+    <p className={`mt-2 text-xs ${
+      appliedCoupon ? "text-emerald-400" : "text-red-400"
+    }`}>
+      {couponMessage}
+    </p>
+  )}
+
+  {appliedCoupon && (
+    <button
+      type="button"
+      onClick={removeCoupon}
+      className="mt-2 text-[10px] font-bold text-zinc-500 hover:text-white"
+    >
+      REMOVER CUPOM
+    </button>
+  )}
+</div>{errorFor("cart")}<button disabled={processing} className="mt-5 w-full rounded-lg bg-red-600 px-5 py-4 text-xs font-black tracking-wider transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-60">{processing ? "GERANDO PEDIDO..." : "FINALIZAR PEDIDO"}</button></aside></form>;
 }
 
 function EmptyCheckout() { return <div className="border border-dashed border-white/15 py-20 text-center"><p className="font-bold">Seu carrinho está vazio.</p><Link href="/#catalogo" className="mt-5 inline-block rounded-lg bg-red-600 px-5 py-3 text-xs font-black">VOLTAR PARA A LOJA</Link></div>; }

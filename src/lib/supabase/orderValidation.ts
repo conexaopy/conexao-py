@@ -18,6 +18,7 @@ export type ValidatedOrderInput = {
   customer: Customer;
   address: Address;
   items: CartInput[];
+  couponCode?: string;
 };
 
 function invalid(message: string): never {
@@ -104,5 +105,20 @@ export function validateOrderInput(value: unknown): ValidatedOrderInput {
     return { id, quantity };
   });
 
-  return { requestId, customer, address, items };
+  const couponCode =
+    typeof input.couponCode === "string"
+      ? input.couponCode.trim().toUpperCase()
+      : "";
+
+  if (couponCode.length > 100) {
+    invalid("Cupom inválido.");
+  }
+
+  return {
+    requestId,
+    customer,
+    address,
+    items,
+    couponCode: couponCode || undefined,
+  };
 }

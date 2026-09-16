@@ -2,10 +2,11 @@ import "server-only";
 
 import { getSupabaseServerClient } from "./server";
 import { getStoreSettings } from "./storeSettings";
+import { validateCoupon } from "./coupons";
 import type { Address, Customer, Order, OrderItem } from "../../app/orderTypes";
 
 type CartInput = { id: string; quantity: number };
-type CreateOrderInput = { requestId: string; customer: Customer; address: Address; items: CartInput[] };
+type CreateOrderInput = { requestId: string; customer: Customer; address: Address; items: CartInput[]; couponCode?: string };
 type ProductRow = { id: string; name: string; presentation: string | null; price: number | string; promo_price: number | string | null; stock_quantity: number | null; active: boolean };
 
 const orderStatus = "AGUARDANDO PAGAMENTO" as const;
@@ -18,7 +19,7 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ or
   if (!input.requestId || !input.items.length) throw serverError("Carrinho vazio.");
   if (!input.customer.name.trim() || !input.customer.cpf || !input.customer.whatsapp || !input.customer.email || !input.address.cep || !input.address.street || !input.address.number || !input.address.neighborhood || !input.address.city || !input.address.state) throw serverError("Dados obrigatórios incompletos.");
 
-  const { data: existingOrder, error: existingError } = await client.from("orders").select("id,order_number,customer_name,customer_cpf,customer_whatsapp,customer_email,delivery_cep,delivery_street,delivery_number,delivery_complement,delivery_neighborhood,delivery_city,delivery_state,status,subtotal,discount,shipping,total,created_at,confirmation_token").eq("id", input.requestId).maybeSingle();
+  const { data: existingOrder, error: existingError } = await client.from("orders").select("id,order_number,customer_name,customer_cpf,customer_whatsapp,customer_email,delivery_cep,delivery_street,delivery_number,delivery_complement,delivery_neighborhood,delivery_city,delivery_state,status,subtotal,discount,shipping,total,coupon_code,created_at,confirmation_token").eq("id", input.requestId).maybeSingle();
   if (existingError) throw new Error("Não foi possível verificar o pedido.");
   if (existingOrder) {
     const { data: existingItems, error: existingItemsError } = await client.from("order_items").select("product_id,product_name,product_presentation,quantity,unit_price").eq("order_id", existingOrder.id);
@@ -39,7 +40,18 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ or
     return { id: product.id, name: product.name, presentation: product.presentation ?? "Apresentação não informada", price: Number(product.promo_price ?? product.price), accent: "#d93636", quantity: item.quantity };
   });
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discount = subtotal > 700 ? subtotal * .1 : 0;
+
+  const couponCode = input.couponCode?.trim().toUpperCase() || "";
+  const coupon = couponCode
+    ? await validateCoupon(couponCode, subtotal)
+    : null;
+
+  const discount = coupon
+    ? coupon.discount
+    : subtotal > 700
+      ? Number((subtotal * 0.1).toFixed(2))
+      : 0;
+
   const storeSettings = await getStoreSettings();
   const shipping =
     subtotal === 0 || subtotal >= storeSettings.freeShippingFrom
@@ -59,7 +71,14 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ or
     customerId = newCustomer.id;
     createdCustomer = true;
   }
-  const orderPayload = { id: input.requestId, order_number: orderNumber, customer_id: customerId, customer_name: input.customer.name, customer_cpf: input.customer.cpf, customer_whatsapp: input.customer.whatsapp, customer_email: input.customer.email, delivery_cep: input.address.cep, delivery_street: input.address.street, delivery_number: input.address.number, delivery_complement: input.address.complement || null, delivery_neighborhood: input.address.neighborhood, delivery_city: input.address.city, delivery_state: input.address.state, status: orderStatus, subtotal, discount, shipping, total };
+  const orderPayload = { id: input.requestId, order_number: orderNumber, customer_id: customerId, customer_name: input.customer.name, customer_cpf: input.customer.cpf, customer_whatsapp: input.customer.whatsapp, customer_email: input.customer.email, delivery_cep: input.address.cep, delivery_street: input.address.street, delivery_number: input.address.number, delivery_complement: input.address.complement || null, delivery_neighborhood: input.address.neighborhood, delivery_city: input.address.city, delivery_state: input.address.state, status: orderStatus,
+    subtotal,
+    discount,
+    shipping,
+    total,
+    coupon_id: coupon?.id ?? null,
+    coupon_code: coupon?.code ?? null,
+  };
   const { data: savedOrder, error: orderError } = await client.from("orders").insert(orderPayload).select("*").single();
   if (orderError || !savedOrder) { if (createdCustomer && customerId) await client.from("customers").delete().eq("id", customerId); throw new Error("Não foi possível salvar o pedido."); }
   const itemPayload = orderItems.map((item) => ({ order_id: savedOrder.id, product_id: item.id, product_name: item.name, product_presentation: item.presentation, quantity: item.quantity, unit_price: item.price }));
@@ -119,4 +138,7 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ or
   };
 }
 
-function orderFromRow(row: Record<string, unknown>, items: OrderItem[]): Order { return { id: String(row.id), orderNumber: String(row.order_number), createdAt: String(row.created_at), status: row.status as Order["status"], customer: { name: String(row.customer_name), cpf: String(row.customer_cpf), whatsapp: String(row.customer_whatsapp), email: String(row.customer_email) }, address: { cep: String(row.delivery_cep), street: String(row.delivery_street), number: String(row.delivery_number), complement: String(row.delivery_complement ?? ""), neighborhood: String(row.delivery_neighborhood), city: String(row.delivery_city), state: String(row.delivery_state) }, items, subtotal: Number(row.subtotal), discount: Number(row.discount), shipping: Number(row.shipping), total: Number(row.total) }; }
+function orderFromRow(row: Record<string, unknown>, items: OrderItem[]): Order { return { id: String(row.id), orderNumber: String(row.order_number), createdAt: String(row.created_at), status: row.status as Order["status"], customer: { name: String(row.customer_name), cpf: String(row.customer_cpf), whatsapp: String(row.customer_whatsapp), email: String(row.customer_email) }, address: { cep: String(row.delivery_cep), street: String(row.delivery_street), number: String(row.delivery_number), complement: String(row.delivery_complement ?? ""), neighborhood: String(row.delivery_neighborhood), city: String(row.delivery_city), state: String(row.delivery_state) }, items, subtotal: Number(row.subtotal), discount: Number(row.discount), shipping: Number(row.shipping),
+    total: Number(row.total),
+    couponCode: row.coupon_code ? String(row.coupon_code) : null,
+  }; }

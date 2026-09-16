@@ -60,7 +60,7 @@ export async function updateAdminOrder(id: string, status: string, tracking?: { 
 
   if (status === "CANCELADO") {
     const { error: stockError } = await client.rpc(
-      "release_order_stock",
+      "cancel_order",
       {
         p_order_id: id,
       },
