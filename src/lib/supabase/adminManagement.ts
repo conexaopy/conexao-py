@@ -22,5 +22,53 @@ const couponFields = "id,code,description,discount_type,discount_value,minimum_o
 export async function listCoupons() { const { data, error } = await getSupabaseServerClient().from("coupons").select(couponFields).order("created_at", { ascending: false }); if (error) throw new Error("Não foi possível carregar cupons."); return data ?? []; }
 export async function saveCoupon(id: string | undefined, input: Record<string, unknown>) { const payload = { code: String(input.code ?? "").trim().toUpperCase(), description: String(input.description ?? "").trim() || null, discount_type: String(input.discount_type ?? "PERCENTAGE"), discount_value: Number(input.discount_value), minimum_order: Number(input.minimum_order ?? 0), maximum_discount: input.maximum_discount === "" || input.maximum_discount == null ? null : Number(input.maximum_discount), usage_limit: input.usage_limit === "" || input.usage_limit == null ? null : Number(input.usage_limit), starts_at: input.starts_at || null, expires_at: input.expires_at || null, active: Boolean(input.active) }; if (!payload.code || !Number.isFinite(payload.discount_value) || payload.discount_value < 0) throw new Error("Código e valor de desconto são obrigatórios."); const client = getSupabaseServerClient(); const query = id ? client.from("coupons").update(payload).eq("id", id) : client.from("coupons").insert(payload); const { data, error } = await query.select(couponFields).single(); if (error) throw new Error("Não foi possível salvar o cupom."); return data; }
 
+export async function deleteCoupon(id: string) {
+  if (!id) throw new Error("Cupom não informado.");
+
+  const client = getSupabaseServerClient();
+
+  const { data: coupon, error: couponError } = await client
+    .from("coupons")
+    .select("id,code,used_count")
+    .eq("id", id)
+    .single();
+
+  if (couponError || !coupon) {
+    throw new Error("Cupom não encontrado.");
+  }
+
+  if (Number(coupon.used_count ?? 0) > 0) {
+    throw new Error(
+      "Este cupom já foi utilizado e não pode ser excluído. Desative o cupom para preservar o histórico dos pedidos.",
+    );
+  }
+
+  const { count, error: ordersError } = await client
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("coupon_id", id);
+
+  if (ordersError) {
+    throw new Error("Não foi possível verificar o histórico do cupom.");
+  }
+
+  if ((count ?? 0) > 0) {
+    throw new Error(
+      "Este cupom possui pedidos vinculados e não pode ser excluído. Desative o cupom para preservar o histórico.",
+    );
+  }
+
+  const { error } = await client
+    .from("coupons")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    throw new Error("Não foi possível excluir o cupom.");
+  }
+
+  return { id, code: coupon.code };
+}
+
 export async function listSettings() { const { data, error } = await getSupabaseServerClient().from("settings").select("key,value,description,created_at,updated_at").order("key"); if (error) throw new Error("Não foi possível carregar configurações."); return data ?? []; }
 export async function updateSetting(key: string, value: string) { const { data, error } = await getSupabaseServerClient().from("settings").update({ value }).eq("key", key).select("key,value,description,updated_at").single(); if (error) throw new Error("Não foi possível atualizar a configuração."); return data; }
