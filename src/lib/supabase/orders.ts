@@ -48,9 +48,7 @@ export async function createSupabaseOrder(input: CreateOrderInput): Promise<{ or
 
   const discount = coupon
     ? coupon.discount
-    : subtotal > 700
-      ? Number((subtotal * 0.1).toFixed(2))
-      : 0;
+    : 0;
 
   const storeSettings = await getStoreSettings();
   const shipping =
