@@ -149,6 +149,23 @@ export function AdminProducts() {
   }, [load]);
 
   useEffect(() => {
+    if (categories.length === 0 || editing) {
+      return;
+    }
+
+    setForm((current) => {
+      if (current.category_id) {
+        return current;
+      }
+
+      return {
+        ...current,
+        category_id: categories[0].id,
+      };
+    });
+  }, [categories, editing]);
+
+  useEffect(() => {
     return () => {
       if (previewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
