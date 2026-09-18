@@ -19,5 +19,6 @@
       "binding": "VINEXT_KV_CACHE",
       "id": "18e4be50660c43a997ed1ae46877b463"
     }
-  ]
+  ],
+  "keep_vars": true
 }
